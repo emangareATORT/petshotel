@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="PetsHotel.Core/PetsHotel.Core.csproj" />
+  <Project Path="PetsHotel.Tests/PetsHotel.Tests.csproj" />
+  <Project Path="PetsHotel/PetsHotel.csproj" />
+</Solution>
