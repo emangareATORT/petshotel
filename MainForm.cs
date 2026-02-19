@@ -7,6 +7,7 @@ public sealed class MainForm : Form
 {
     private readonly string _connectionString;
 
+    private readonly ComboBox _knownDogsComboBox = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 380 };
     private readonly TextBox _dogNameTextBox = new() { Width = 220 };
     private readonly TextBox _ownerNameTextBox = new() { Width = 220 };
     private readonly TextBox _ownerMobileTextBox = new() { Width = 220 };
@@ -41,6 +42,7 @@ public sealed class MainForm : Form
 
         BuildUi();
         EnsureDatabase();
+        LoadDogProfiles();
         LoadActiveStays();
         LoadStaysGrid();
     }
@@ -63,35 +65,45 @@ public sealed class MainForm : Form
         {
             Dock = DockStyle.Top,
             ColumnCount = 2,
-            RowCount = 8,
+            RowCount = 9,
             AutoSize = true,
             Padding = new Padding(16)
         };
 
-        layout.Controls.Add(new Label { Text = "Dog name", AutoSize = true }, 0, 0);
-        layout.Controls.Add(_dogNameTextBox, 1, 0);
+        var loadProfileButton = new Button { Text = "Load profile", Width = 160, Height = 30 };
+        loadProfileButton.Click += (_, _) => ApplySelectedDogProfile();
 
-        layout.Controls.Add(new Label { Text = "Owner name", AutoSize = true }, 0, 1);
-        layout.Controls.Add(_ownerNameTextBox, 1, 1);
+        var profileRow = new FlowLayoutPanel { AutoSize = true };
+        profileRow.Controls.Add(_knownDogsComboBox);
+        profileRow.Controls.Add(loadProfileButton);
 
-        layout.Controls.Add(new Label { Text = "Owner mobile", AutoSize = true }, 0, 2);
-        layout.Controls.Add(_ownerMobileTextBox, 1, 2);
+        layout.Controls.Add(new Label { Text = "Known dogs", AutoSize = true }, 0, 0);
+        layout.Controls.Add(profileRow, 1, 0);
 
-        layout.Controls.Add(new Label { Text = "Arrival date", AutoSize = true }, 0, 3);
-        layout.Controls.Add(_arrivalDatePicker, 1, 3);
+        layout.Controls.Add(new Label { Text = "Dog name", AutoSize = true }, 0, 1);
+        layout.Controls.Add(_dogNameTextBox, 1, 1);
 
-        layout.Controls.Add(new Label { Text = "Departure date", AutoSize = true }, 0, 4);
-        layout.Controls.Add(_departureDatePicker, 1, 4);
+        layout.Controls.Add(new Label { Text = "Owner name", AutoSize = true }, 0, 2);
+        layout.Controls.Add(_ownerNameTextBox, 1, 2);
 
-        layout.Controls.Add(new Label { Text = "Food times/day", AutoSize = true }, 0, 5);
-        layout.Controls.Add(_feedingsPerDayNumeric, 1, 5);
+        layout.Controls.Add(new Label { Text = "Owner mobile", AutoSize = true }, 0, 3);
+        layout.Controls.Add(_ownerMobileTextBox, 1, 3);
 
-        layout.Controls.Add(new Label { Text = "Portion size (grams)", AutoSize = true }, 0, 6);
-        layout.Controls.Add(_portionSizeNumeric, 1, 6);
+        layout.Controls.Add(new Label { Text = "Arrival date", AutoSize = true }, 0, 4);
+        layout.Controls.Add(_arrivalDatePicker, 1, 4);
+
+        layout.Controls.Add(new Label { Text = "Departure date", AutoSize = true }, 0, 5);
+        layout.Controls.Add(_departureDatePicker, 1, 5);
+
+        layout.Controls.Add(new Label { Text = "Food times/day", AutoSize = true }, 0, 6);
+        layout.Controls.Add(_feedingsPerDayNumeric, 1, 6);
+
+        layout.Controls.Add(new Label { Text = "Portion size (grams)", AutoSize = true }, 0, 7);
+        layout.Controls.Add(_portionSizeNumeric, 1, 7);
 
         var checkInButton = new Button { Text = "Check in dog", Width = 160, Height = 35 };
         checkInButton.Click += (_, _) => CheckInDog();
-        layout.Controls.Add(checkInButton, 1, 7);
+        layout.Controls.Add(checkInButton, 1, 8);
 
         page.Controls.Add(layout);
         return page;
@@ -136,6 +148,7 @@ public sealed class MainForm : Form
         var refreshButton = new Button { Text = "Refresh", Dock = DockStyle.Top, Height = 36 };
         refreshButton.Click += (_, _) =>
         {
+            LoadDogProfiles();
             LoadActiveStays();
             LoadStaysGrid();
         };
@@ -167,6 +180,18 @@ public sealed class MainForm : Form
                 TotalAmount REAL,
                 CheckedOutAt TEXT
             );
+
+            CREATE TABLE IF NOT EXISTS DogProfile (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                DogName TEXT NOT NULL,
+                OwnerName TEXT NOT NULL,
+                OwnerMobile TEXT NOT NULL,
+                FeedingsPerDay INTEGER NOT NULL,
+                PortionSizeGrams INTEGER NOT NULL,
+                CreatedAt TEXT NOT NULL,
+                UpdatedAt TEXT NOT NULL,
+                UNIQUE (DogName, OwnerMobile)
+            );
             """;
 
         command.ExecuteNonQuery();
@@ -190,6 +215,12 @@ public sealed class MainForm : Form
             return;
         }
 
+        var dogName = _dogNameTextBox.Text.Trim();
+        var ownerName = _ownerNameTextBox.Text.Trim();
+        var ownerMobile = _ownerMobileTextBox.Text.Trim();
+        var feedingsPerDay = (int)_feedingsPerDayNumeric.Value;
+        var portionSizeGrams = (int)_portionSizeNumeric.Value;
+
         using var connection = new SqliteConnection(_connectionString);
         connection.Open();
 
@@ -202,23 +233,106 @@ public sealed class MainForm : Form
                 ($dog, $owner, $mobile, $arrival, $departure, $feedings, $portion);
             """;
 
-        command.Parameters.AddWithValue("$dog", _dogNameTextBox.Text.Trim());
-        command.Parameters.AddWithValue("$owner", _ownerNameTextBox.Text.Trim());
-        command.Parameters.AddWithValue("$mobile", _ownerMobileTextBox.Text.Trim());
+        command.Parameters.AddWithValue("$dog", dogName);
+        command.Parameters.AddWithValue("$owner", ownerName);
+        command.Parameters.AddWithValue("$mobile", ownerMobile);
         command.Parameters.AddWithValue("$arrival", arrival.ToString("yyyy-MM-dd"));
         command.Parameters.AddWithValue("$departure", departure.ToString("yyyy-MM-dd"));
-        command.Parameters.AddWithValue("$feedings", (int)_feedingsPerDayNumeric.Value);
-        command.Parameters.AddWithValue("$portion", (int)_portionSizeNumeric.Value);
+        command.Parameters.AddWithValue("$feedings", feedingsPerDay);
+        command.Parameters.AddWithValue("$portion", portionSizeGrams);
         command.ExecuteNonQuery();
+
+        SaveOrUpdateDogProfile(dogName, ownerName, ownerMobile, feedingsPerDay, portionSizeGrams);
 
         MessageBox.Show("Dog checked in successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
         ClearCheckInInputs();
+        LoadDogProfiles();
         LoadActiveStays();
         LoadStaysGrid();
     }
 
+    private void SaveOrUpdateDogProfile(string dogName, string ownerName, string ownerMobile, int feedingsPerDay, int portionSizeGrams)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO DogProfile
+                (DogName, OwnerName, OwnerMobile, FeedingsPerDay, PortionSizeGrams, CreatedAt, UpdatedAt)
+            VALUES
+                ($dog, $owner, $mobile, $feedings, $portion, $createdAt, $updatedAt)
+            ON CONFLICT(DogName, OwnerMobile) DO UPDATE SET
+                OwnerName = excluded.OwnerName,
+                FeedingsPerDay = excluded.FeedingsPerDay,
+                PortionSizeGrams = excluded.PortionSizeGrams,
+                UpdatedAt = excluded.UpdatedAt;
+            """;
+
+        var now = DateTime.UtcNow.ToString("O");
+        command.Parameters.AddWithValue("$dog", dogName);
+        command.Parameters.AddWithValue("$owner", ownerName);
+        command.Parameters.AddWithValue("$mobile", ownerMobile);
+        command.Parameters.AddWithValue("$feedings", feedingsPerDay);
+        command.Parameters.AddWithValue("$portion", portionSizeGrams);
+        command.Parameters.AddWithValue("$createdAt", now);
+        command.Parameters.AddWithValue("$updatedAt", now);
+        command.ExecuteNonQuery();
+    }
+
+    private void LoadDogProfiles()
+    {
+        var items = new List<DogProfileItem> { DogProfileItem.Empty };
+
+        using var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Id, DogName, OwnerName, OwnerMobile, FeedingsPerDay, PortionSizeGrams
+            FROM DogProfile
+            ORDER BY DogName, OwnerName;
+            """;
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            items.Add(
+                new DogProfileItem(
+                    reader.GetInt64(0),
+                    reader.GetString(1),
+                    reader.GetString(2),
+                    reader.GetString(3),
+                    reader.GetInt32(4),
+                    reader.GetInt32(5)));
+        }
+
+        _knownDogsComboBox.DataSource = items;
+        _knownDogsComboBox.DisplayMember = nameof(DogProfileItem.Display);
+        _knownDogsComboBox.ValueMember = nameof(DogProfileItem.Id);
+        _knownDogsComboBox.SelectedIndex = 0;
+    }
+
+    private void ApplySelectedDogProfile()
+    {
+        if (_knownDogsComboBox.SelectedItem is not DogProfileItem selected || selected.Id == 0)
+        {
+            MessageBox.Show("Select a known dog profile first.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        _dogNameTextBox.Text = selected.DogName;
+        _ownerNameTextBox.Text = selected.OwnerName;
+        _ownerMobileTextBox.Text = selected.OwnerMobile;
+        _feedingsPerDayNumeric.Value = selected.FeedingsPerDay;
+        _portionSizeNumeric.Value = selected.PortionSizeGrams;
+    }
+
     private void ClearCheckInInputs()
     {
+        _knownDogsComboBox.SelectedIndex = 0;
         _dogNameTextBox.Clear();
         _ownerNameTextBox.Clear();
         _ownerMobileTextBox.Clear();
@@ -374,6 +488,21 @@ public sealed class MainForm : Form
 
     private sealed record StayItem(long Id, string Display);
     private sealed record PricingResult(int StayDays, decimal DailyTariff, decimal Total);
+
+    private sealed record DogProfileItem(
+        long Id,
+        string DogName,
+        string OwnerName,
+        string OwnerMobile,
+        int FeedingsPerDay,
+        int PortionSizeGrams)
+    {
+        public static DogProfileItem Empty => new(0, string.Empty, string.Empty, string.Empty, 2, 200);
+
+        public string Display => Id == 0
+            ? "-- Select known dog --"
+            : $"{DogName} - {OwnerName} ({OwnerMobile})";
+    }
 }
 
 internal sealed class SqliteDataAdapter : IDisposable
