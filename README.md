@@ -5,6 +5,7 @@ This repository contains a C# Windows Forms app to manage dog stays in a pets ho
 ## Main functionality
 
 - **Check in** a dog with:
+  - Optional **known dog profile** selector to prefill repeated data
   - Dog name
   - Owner name
   - Owner mobile number
@@ -44,5 +45,5 @@ The generated executable will be under:
 
 ## Notes
 
-- The app creates the SQLite table (`DogStay`) automatically on first launch.
+- The app creates the SQLite tables (`DogStay`, `DogProfile`) automatically on first launch.
 - A minimum of 1 day is charged even when arrival and departure dates are the same.
